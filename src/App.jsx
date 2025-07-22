@@ -107,7 +107,7 @@ export default function App() {
     // This is where you would call your backend API
     // For local development, make sure your Python backend is running
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/query', { // Replace with your deployed backend URL later
+        const response = await fetch('https://hexar-backend.onrender.com', { // Replace with your deployed backend URL later
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ level, style, product_type: productType }),
