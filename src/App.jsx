@@ -1,7 +1,7 @@
 // src/App.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { Bar, Radar } from 'react-chartjs-2';
+import { Radar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -68,10 +68,8 @@ export default function App() {
   const [showMasked, setShowMasked] = useState(false);
   const [error, setError] = useState('');
 
-  // Form state
-  const [level, setLevel] = useState('intermediate');
-  const [style, setStyle] = useState('all-mountain');
-  const [productType, setProductType] = useState('snowboard');
+  // Form state - replaced with natural language input
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -104,13 +102,12 @@ export default function App() {
     setShowMasked(false);
     setResults(null);
 
-    // This is where you would call your backend API
-    // For local development, make sure your Python backend is running
+    // Send natural language query to backend
     try {
-        const response = await fetch('https://hexar-backend.onrender.com', { // Replace with your deployed backend URL later
+        const response = await fetch('https://hexar-backend.onrender.com/api/query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ level, style, product_type: productType }),
+            body: JSON.stringify({ search_query: searchQuery }),
         });
 
         if (!response.ok) {
@@ -135,36 +132,42 @@ export default function App() {
         </header>
 
         <main>
-          <div className="max-w-2xl mx-auto bg-gray-900 p-8 rounded-lg shadow-lg">
+          <div className="max-w-4xl mx-auto bg-gray-900 p-8 rounded-lg shadow-lg">
             <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div>
-                  <label className="block mb-2 text-sm font-bold">Product Type</label>
-                  <select value={productType} onChange={(e) => setProductType(e.target.value)} className="w-full p-2 bg-gray-800 rounded border border-gray-700">
-                    <option value="snowboard">Snowboard</option>
-                    <option value="boots">Boots</option>
-                    <option value="bindings">Bindings</option>
-                  </select>
+              <div className="mb-6">
+                <label className="block mb-4 text-lg font-bold text-center">What gear are you looking for?</label>
+                <div className="relative">
+                  <textarea
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Tell us what you need! For example: 'I'm looking for an intermediate all-mountain snowboard under $400' or 'Need beginner-friendly boots for freestyle riding'"
+                    className="w-full p-4 bg-gray-800 rounded-lg border border-gray-700 text-white placeholder-gray-400 resize-none h-24 focus:ring-2 focus:ring-white focus:border-transparent"
+                    required
+                  />
+                  <div className="absolute bottom-2 right-2 text-xs text-gray-500">
+                    {searchQuery.length}/200
+                  </div>
                 </div>
-                <div>
-                  <label className="block mb-2 text-sm font-bold">Your Level</label>
-                  <select value={level} onChange={(e) => setLevel(e.target.value)} className="w-full p-2 bg-gray-800 rounded border border-gray-700">
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block mb-2 text-sm font-bold">Riding Style</label>
-                  <select value={style} onChange={(e) => setStyle(e.target.value)} className="w-full p-2 bg-gray-800 rounded border border-gray-700">
-                    <option value="all-mountain">All-Mountain</option>
-                    <option value="freestyle">Freestyle</option>
-                    <option value="freeride">Freeride</option>
-                  </select>
+                <div className="mt-2 text-sm text-gray-400">
+                  💡 Try including: product type, skill level, riding style, budget, or specific features you want
                 </div>
               </div>
-              <button type="submit" className="w-full bg-white text-black font-bold py-3 px-4 rounded hover:bg-gray-300 transition-colors" disabled={isLoading}>
-                {isLoading ? 'Researching...' : 'Get Comparison'}
+              <button 
+                type="submit" 
+                className="w-full bg-white text-black font-bold py-4 px-6 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                disabled={isLoading || !searchQuery.trim()}
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    AI is researching your perfect gear...
+                  </span>
+                ) : (
+                  'Find My Perfect Gear'
+                )}
               </button>
             </form>
           </div>
@@ -199,30 +202,73 @@ export default function App() {
 
 // --- Results Display Component ---
 const ResultsDisplay = ({ results }) => {
+    const [bookmarkedItems, setBookmarkedItems] = useState(new Set());
+    
+    const toggleBookmark = (productId) => {
+        setBookmarkedItems(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(productId)) {
+                newSet.delete(productId);
+            } else {
+                newSet.add(productId);
+            }
+            return newSet;
+        });
+    };
+
     if (!results || !results.products) return null;
+    
     return (
         <div className="mt-12">
+            <h2 className="text-3xl font-bold text-center mb-8">Perfect Matches for You</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {results.products.map((item, index) => (
-                    <div key={index} className="bg-gray-900 p-6 rounded-lg flex flex-col">
+                    <div key={index} className="bg-gray-900 p-6 rounded-lg flex flex-col relative">
+                        {/* Bookmark Button */}
+                        <button
+                            onClick={() => toggleBookmark(index)}
+                            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 transition-colors"
+                        >
+                            <svg
+                                className={`w-6 h-6 ${bookmarkedItems.has(index) ? 'text-yellow-400 fill-current' : 'text-white'}`}
+                                fill={bookmarkedItems.has(index) ? 'currentColor' : 'none'}
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                            </svg>
+                        </button>
+
                         <img src={item.image_url} alt={item.name} className="w-full h-48 object-cover rounded mb-4" />
                         <h3 className="text-xl font-bold mb-2">{item.name}</h3>
-                        <p className="text-2xl font-bold mb-4">{item.price}</p>
+                        <div className="flex justify-between items-center mb-4">
+                            <p className="text-2xl font-bold text-green-400">{item.price}</p>
+                            <div className="flex items-center">
+                                <span className="text-yellow-400 text-lg">★</span>
+                                <span className="text-white font-bold ml-1">{item.overall_rating}/10</span>
+                            </div>
+                        </div>
+                        
                         <div className="w-full h-64 mb-4"><HexarChart ratings={item.ratings} /></div>
 
                         <div className="text-sm mb-4 flex-grow">
-                            <h4 className="font-bold text-green-400">Pros</h4>
-                            <ul className="list-disc list-inside text-gray-300">
-                                {item.pros.map((pro, i) => <li key={i}>{pro}</li>)}
+                            <h4 className="font-bold text-green-400 mb-1">✓ Pros</h4>
+                            <ul className="list-none text-gray-300 mb-3">
+                                {item.pros.map((pro, i) => <li key={i} className="mb-1">• {pro}</li>)}
                             </ul>
-                            <h4 className="font-bold text-red-400 mt-2">Cons</h4>
-                            <ul className="list-disc list-inside text-gray-300">
-                                {item.cons.map((con, i) => <li key={i}>{con}</li>)}
+                            <h4 className="font-bold text-red-400 mb-1">✗ Cons</h4>
+                            <ul className="list-none text-gray-300">
+                                {item.cons.map((con, i) => <li key={i} className="mb-1">• {con}</li>)}
                             </ul>
                         </div>
 
-                        <a href={item.retailer_url} target="_blank" rel="noopener noreferrer" className="mt-auto block text-center w-full bg-white text-black font-bold py-2 px-4 rounded hover:bg-gray-300 transition-colors">
-                            View Deal
+                        <a 
+                            href={item.retailer_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="mt-auto block text-center w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 px-4 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105"
+                        >
+                            Shop Now - Best Deal 🔗
                         </a>
                     </div>
                 ))}
