@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  # Redis for message broker and caching
+  redis:
+    image: redis:7-alpine
+    container_name: hexar-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL database (via Supabase in production, local for development)
+  postgres:
+    image: postgres:15-alpine
+    container_name: hexar-postgres
+    environment:
+      POSTGRES_DB: hexar_dev
+      POSTGRES_USER: hexar_user
+      POSTGRES_PASSWORD: hexar_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hexar_user -d hexar_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # FastAPI backend with multi-agent system
+  backend:
+    build:
+      context: ./hexar-backend
+      dockerfile: Dockerfile
+    container_name: hexar-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://hexar_user:hexar_password@postgres:5432/hexar_dev
+    volumes:
+      - ./hexar-backend:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery worker for async agent tasks
+  celery-worker:
+    build:
+      context: ./hexar-backend
+      dockerfile: Dockerfile
+    container_name: hexar-celery-worker
+    command: celery -A mcp.message_broker worker --loglevel=info
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://hexar_user:hexar_password@postgres:5432/hexar_dev
+    volumes:
+      - ./hexar-backend:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  # Next.js frontend
+  frontend:
+    build:
+      context: ./hexar-frontend
+      dockerfile: Dockerfile
+    container_name: hexar-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_AGENT_WEBSOCKET_URL=ws://backend:8000/agents/ws
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    volumes:
+      - ./hexar-frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Agent monitoring dashboard (optional)
+  monitoring:
+    image: prom/prometheus:latest
+    container_name: hexar-monitoring
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+
+volumes:
+  redis_data:
+  postgres_data:
+  prometheus_data:
+
+networks:
+  default:
+    name: hexar-network
