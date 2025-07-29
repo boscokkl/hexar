@@ -1,0 +1,68 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Hexar Backend API
+  - job_name: 'hexar-backend'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    
+  # Agent Health Monitoring
+  - job_name: 'hexar-agents'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: '/agents/health'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    
+  # Enhanced MCP System
+  - job_name: 'hexar-mcp'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: '/api/enhanced/system-status'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    
+  # Resource Pool Monitoring
+  - job_name: 'hexar-resources'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: '/resources/status'
+    scrape_interval: 60s
+    scrape_timeout: 15s
+    
+  # Frontend Performance (if metrics endpoint added)
+  - job_name: 'hexar-frontend'
+    static_configs:
+      - targets: ['frontend:3000']
+    metrics_path: '/api/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    # This job may fail until frontend metrics are implemented
+    
+  # Self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+# Alerting configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Remote write/read configuration (for production)
+# remote_write:
+#   - url: "https://your-prometheus-remote-write-endpoint"
+#     basic_auth:
+#       username: "your-username"
+#       password: "your-password"

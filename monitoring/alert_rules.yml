@@ -1,0 +1,84 @@
+groups:
+  - name: hexar_backend_alerts
+    rules:
+      # High API Error Rate
+      - alert: HighAPIErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API error rate detected"
+          description: "API error rate is {{ $value }} errors per second"
+          
+      # Agent Health Issues
+      - alert: UnhealthyAgents
+        expr: hexar_agents_unhealthy_count > 2
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Multiple agents are unhealthy"
+          description: "{{ $value }} agents are currently unhealthy"
+          
+      # MCP System Down
+      - alert: MCPSystemDown
+        expr: up{job="hexar-mcp"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "MCP system is down"
+          description: "The Multi-Agent Communication Protocol system is not responding"
+          
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 > 512
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}MB"
+          
+      # Database Connection Issues
+      - alert: DatabaseConnectionIssues
+        expr: hexar_database_connection_errors_total > 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection issues"
+          description: "Database connection errors detected"
+
+  - name: hexar_performance_alerts
+    rules:
+      # Slow Query Response
+      - alert: SlowQueryResponse
+        expr: histogram_quantile(0.95, rate(hexar_query_duration_seconds_bucket[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow query response times"
+          description: "95th percentile query response time is {{ $value }}s"
+          
+      # High Queue Length
+      - alert: HighMessageQueueLength
+        expr: hexar_mcp_queue_length > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High message queue length"
+          description: "Message queue length is {{ $value }}"
+          
+      # Circuit Breaker Open
+      - alert: CircuitBreakerOpen
+        expr: hexar_circuit_breaker_state{state="open"} == 1
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "Circuit breaker for {{ $labels.agent }} is open"
