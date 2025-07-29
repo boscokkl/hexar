@@ -3,11 +3,12 @@
 Test script for monitoring endpoints
 Run this while the backend is running to verify the monitoring dashboard works
 """
+import os
 import requests
 import json
 import time
 
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 def test_endpoint(endpoint, description):
     """Test a single endpoint"""
@@ -72,7 +73,7 @@ def main():
     if success_count == total_tests:
         print("🎉 All monitoring endpoints are working!")
         print("🚀 You can now access the monitoring dashboard at:")
-        print("   Frontend: http://localhost:3000/monitoring")
+        print(f"   Frontend: http://{os.getenv('FRONTEND_HOST', 'localhost')}:{os.getenv('FRONTEND_PORT', '3000')}/monitoring")
         print("   (Make sure to start the frontend with: npm run dev)")
     else:
         print("⚠️  Some endpoints failed. Make sure the backend is running:")
