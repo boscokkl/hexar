@@ -1,7 +1,27 @@
 version: '3.8'
 
 services:
-  # Redis for message broker and caching
+  # RabbitMQ for message broker (Enterprise Scale)
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: hexar-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: hexar_user
+      RABBITMQ_DEFAULT_PASS: hexar_password
+      RABBITMQ_DEFAULT_VHOST: hexar_vhost
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for caching and session storage
   redis:
     image: redis:7-alpine
     container_name: hexar-redis
@@ -46,10 +66,14 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://hexar_user:hexar_password@rabbitmq:5672/hexar_vhost
       - DATABASE_URL=postgresql://hexar_user:hexar_password@postgres:5432/hexar_dev
+      - MESSAGE_BROKER_TYPE=${MESSAGE_BROKER_TYPE:-rabbitmq}  # rabbitmq or redis for backward compatibility
     volumes:
       - ./hexar-backend:/app
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       redis:
         condition: service_healthy
       postgres:
@@ -72,10 +96,14 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://hexar_user:hexar_password@rabbitmq:5672/hexar_vhost
       - DATABASE_URL=postgresql://hexar_user:hexar_password@postgres:5432/hexar_dev
+      - MESSAGE_BROKER_TYPE=${MESSAGE_BROKER_TYPE:-rabbitmq}  # rabbitmq or redis for backward compatibility
     volumes:
       - ./hexar-backend:/app
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       redis:
         condition: service_healthy
       backend:
@@ -118,6 +146,7 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
 
 volumes:
+  rabbitmq_data:
   redis_data:
   postgres_data:
   prometheus_data:
