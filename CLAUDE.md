@@ -25,7 +25,7 @@ User Query → Consumer Agent → MCP → Vendor Agents → Personalized Results
 - Framework: **FastAPI** (async API services)
 - AI Framework: **LangChain** (agent orchestration, ReAct patterns)
 - LLM: **Google Gemini** or OpenAI GPT-4
-- Message Broker: **RabbitMQ** (inter-agent communication)
+- Message Broker: **Custom MCP Protocol** (MVP: serverless-optimized, Future: RabbitMQ for clustering)
 - Database: **PostgreSQL** via Supabase
 
 **Key Dependencies**
@@ -34,7 +34,7 @@ User Query → Consumer Agent → MCP → Vendor Agents → Personalized Results
 fastapi>=0.116.1
 langchain>=0.1.0
 google-generativeai>=0.3.2
-celery[redis]>=5.3.0  # For RabbitMQ
+# celery[redis]>=5.3.0  # Future: For RabbitMQ clustering
 supabase>=2.0.0
 
 # Agent tools
@@ -42,6 +42,35 @@ beautifulsoup4>=4.12.2
 selenium>=4.15.0
 requests>=2.31.0
 ```
+
+# 🚀 Architecture Evolution: MVP → Future State
+
+## Current MVP (Serverless-Optimized)
+**Message Broker:** Custom MCP Protocol with in-process communication
+- **Why:** Optimized for Render/Vercel free tiers, zero hosting costs
+- **Benefits:** 10-50x faster than network brokers, serverless-compatible
+- **Trade-offs:** Single container scaling, no cross-service persistence
+
+```python
+# MVP: Direct function calls within FastAPI container
+async def coordinate_agents(message: MCPMessage):
+    return await orchestrator.route_message(message)  # ~1ms latency
+```
+
+## Future State (Enterprise Scale)
+**Message Broker:** RabbitMQ with Celery for multi-node clustering
+- **When:** >10,000 concurrent users, multi-region deployment
+- **Benefits:** Message persistence, multi-service coordination, fault tolerance
+- **Requirements:** Dedicated infrastructure, connection pooling
+
+```python
+# Future: Network-based message queuing
+@celery.task
+def process_agent_message(message_data):
+    channel.basic_publish(exchange='agents', ...)  # ~10-50ms latency
+```
+
+**Migration Trigger:** When single-container performance becomes limiting factor
 
 # Project Structure
 
@@ -86,11 +115,11 @@ curl -X POST localhost:8000/agents/consumer/chat \
 
 **Environment (.env)**
 ```bash
-# Backend
+# Backend (MVP)
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_service_role_key
 GEMINI_API_KEY=your_gemini_key
-RABBITMQ_URL=amqp://localhost:5672
+# RABBITMQ_URL=amqp://localhost:5672  # Future: For RabbitMQ clustering
 
 # Frontend (.env.local)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
