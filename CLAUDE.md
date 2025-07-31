@@ -119,6 +119,7 @@ curl -X POST localhost:8000/agents/consumer/chat \
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_service_role_key
 GEMINI_API_KEY=your_gemini_key
+# REDIS_URL=redis://localhost:6379    # Comment out for MVP in-memory mode
 # RABBITMQ_URL=amqp://localhost:5672  # Future: For RabbitMQ clustering
 
 # Frontend (.env.local)
