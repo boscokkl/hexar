@@ -113,20 +113,48 @@ curl -X POST localhost:8000/agents/consumer/chat \
   -d '{"user_id": "user123", "message": "Find me a snowboard under $500"}'
 ```
 
-**Environment (.env)**
-```bash
-# Backend (MVP)
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_service_role_key
-GEMINI_API_KEY=your_gemini_key
-# REDIS_URL=redis://localhost:6379    # Comment out for MVP in-memory mode
-# RABBITMQ_URL=amqp://localhost:5672  # Future: For RabbitMQ clustering
+# Environment Setup
 
-# Frontend (.env.local)
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-NEXT_PUBLIC_AGENT_WEBSOCKET_URL=ws://localhost:8000/agents/ws
+## Backend Environment (hexar-backend/.env)
+```bash
+# Database - Supabase (required)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-service-role-key-here
+
+# AI Service - Gemini (required)
+GEMINI_API_KEY=your-gemini-api-key-here
+
+# Message Broker - MVP Configuration
+MESSAGE_BROKER_TYPE=memory                    # Options: memory | redis | rabbitmq
+# REDIS_URL=redis://localhost:6379           # Uncomment for Redis
+# RABBITMQ_URL=amqp://localhost:5672         # Uncomment for RabbitMQ
+
+# Server Configuration
+PORT=8000
+HOST=0.0.0.0
+ENVIRONMENT=development
 ```
+
+## Frontend Environment (hexar-frontend/.env.local)
+```bash
+# Supabase Configuration (required)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key-here
+
+# Backend API Configuration
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_AGENT_WEBSOCKET_URL=ws://localhost:8000/agents/ws
+
+# Environment
+NODE_ENV=development
+```
+
+## Production Configuration
+For production deployments, update the following:
+- Set `ENVIRONMENT=production`
+- Use HTTPS URLs for `NEXT_PUBLIC_*` variables
+- Configure proper CORS origins
+- Use dedicated Redis/RabbitMQ instances
 
 # Code Style
 
