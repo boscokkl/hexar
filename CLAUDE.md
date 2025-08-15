@@ -550,6 +550,43 @@ interface AgentMessage {
 - **Redis Pub/Sub**: Real-time message passing with Redis channels
 - **Configuration-Driven**: Timeouts, limits, and behavior controlled via environment variables
 - **Test Coverage**: Unit and integration tests for all critical paths
+- **Hybrid Dict/Object Pattern**: Keep Pydantic objects in business logic, serialize only at I/O boundaries
+
+**Hybrid Dict/Object Implementation**
+```python
+# ✅ Business Logic: Keep objects for type safety
+async def search_products(query: str) -> List[ProductResult]:
+    """Return strongly-typed ProductResult objects"""
+    agent = create_evo_vendor_agent()
+    response = await agent.search_products(request)
+    return response.products  # Keep as ProductResult objects
+
+# ✅ I/O Boundary: Serialize only when needed  
+async def cache_products(products: List[ProductResult]):
+    """Database boundary - serialize once"""
+    serialized_products = []
+    for product in products:
+        product_dict = product.model_dump()  # Use Pydantic serialization
+        # Add computed fields not in the model
+        product_dict['brand'] = extract_brand(product.name) 
+        serialized_products.append(product_dict)
+    
+    await database.insert({'products': serialized_products})
+
+# ✅ API Boundary: Let FastAPI handle serialization
+@app.get("/search")
+async def search_endpoint() -> List[ProductResult]:
+    """FastAPI automatically serializes ProductResult to JSON"""
+    return await search_products(query)  # No manual conversion needed
+
+# ❌ Avoid: Manual dict conversion in business logic
+def bad_approach(products: List[ProductResult]) -> List[Dict]:
+    return [{
+        'name': p.name,
+        'price': p.price,
+        # ... manual field copying loses type safety
+    } for p in products]
+```
 
 # Do Not Section
 
